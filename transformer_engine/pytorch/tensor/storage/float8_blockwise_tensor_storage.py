@@ -427,3 +427,31 @@ class Float8BlockwiseQTensorStorage(QuantizedTensorStorage):
             "rowwise": self._rowwise_data is not None,
             "columnwise": self._columnwise_data is not None,
         }
+
+    ## 
+    def split(self, m_splits: list[int]) -> list[Float8BlockwiseQTensorStorage]:
+        n = len(m_splits)
+        def _split2d(t: Optional[torch.Tensor]) -> list[Optional[torch.Tensor]]:
+            if t is None:
+                return [None] * n
+            assert t.dim() == 2
+            return list(t.split(m_splits, dim=0))
+
+        r_data = _split2d(self._rowwise_data)
+        r_scale = _split2d(self._rowwise_scale_inv)
+        c_data = _split2d(self._columnwise_data)
+        c_scale = _split2d(self._columnwise_scale_inv)
+
+        return [
+            Float8BlockwiseQTensorStorage(
+                r_data[i],
+                r_scale[i],
+                c_data[i],
+                c_scale[i],
+                self._fp8_dtype,
+                self._quantizer,
+                self._is_2D_scaled,
+                self._data_format,
+            )
+            for i in range(n)
+        ]
